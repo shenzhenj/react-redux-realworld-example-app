@@ -1,0 +1,68 @@
+---
+- name: Run app
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+  tasks:
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+        state: latest
+        update_cache: true
+ 
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Enable and start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true    
+   
+    - name: Clone a github repository
+      git:
+        repo: https://github.com/shenzhenj/react-redux-realworld-example-app
+        dest: /home/cheese/repo/
+        clone: yes
+        update: yes
+
+    - name: Build and push Docker image
+      docker_image:
+        path: /home/cheese/repo/react-redux-realworld-example-app/Dockerfile
+        name: node
+        tag: latest
+   
+    - name: Run Docker container
+      docker_container:
+        name: app
+        image: node
+        state: started
+        ports: 
+          - "4100:4100"
+
+    - name: Check that you can connect (GET) to a page and it returns a status 200
+      ansible.builtin.uri:
+        url: localhost:4100
+      register: status_code
+
+    - name: Write status
+      ansible.builtin.debug:
+        msg: "The URL returned {{ status_code }} "
